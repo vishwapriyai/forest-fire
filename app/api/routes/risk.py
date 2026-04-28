@@ -1,0 +1,45 @@
+import json
+from pathlib import Path
+
+import pandas as pd
+from fastapi import APIRouter
+
+
+router = APIRouter()
+
+
+def _read_json(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+@router.get("/")
+def get_risk():
+    path = Path("data/processed/grid_risk.geojson")
+    if not path.exists():
+        path = Path("data/processed/recent_fire_last5.geojson")
+    return _read_json(path)
+
+
+@router.get("/recent")
+def get_recent_fire_risk():
+    return _read_json("data/processed/recent_fire_last5.geojson")
+
+
+@router.get("/historical")
+def get_historical_risk():
+    return _read_json("data/processed/recent_fire_last5.geojson")
+
+
+@router.get("/summary")
+def get_recent_fire_summary():
+    df = pd.read_csv("data/processed/recent_fire_last5.csv")
+    if df.empty:
+        return {"fire_count": 0, "avg_frp": 0, "max_frp": 0}
+
+    return {
+        "fire_count": int(len(df)),
+        "avg_frp": float(df["frp"].mean()),
+        "max_frp": float(df["frp"].max()),
+        "latest_date": str(pd.to_datetime(df["acq_date"]).max().date()),
+    }
