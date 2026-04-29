@@ -60,31 +60,42 @@ select {
 .brand {
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-width: 230px;
+    gap: 10px;
+    min-width: 0;
 }
 
 .brand-mark {
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
     display: grid;
     place-items: center;
-    border-radius: 8px;
-    background: #ffe9cf;
-    color: var(--forest-dark);
-    font-weight: 800;
+    padding: 3px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.96);
+    overflow: hidden;
+}
+
+.brand-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
 }
 
 .brand-title {
     display: block;
     font-size: 16px;
     font-weight: 800;
+    line-height: 1.05;
+    margin: 0;
 }
 
 .brand-subtitle {
     display: block;
-    color: #b9d2c3;
-    font-size: 12px;
+    margin: 2px 0 0;
+    color: rgba(246, 251, 243, 0.7);
+    font-size: 0.85rem;
 }
 
 .system-status {
@@ -276,6 +287,10 @@ h3 {
     background: var(--forest);
 }
 
+.swatch.base {
+    background: linear-gradient(135deg, #27543a 0%, #7fa36c 100%);
+}
+
 .swatch.heat {
     background: var(--ember);
 }
@@ -286,6 +301,10 @@ h3 {
 
 .swatch.prediction {
     background: var(--forest);
+}
+
+.swatch.border {
+    background: #6f5a50;
 }
 
 .swatch.patrol {
@@ -629,6 +648,7 @@ input[type="range"] {
         padding: 14px;
         gap: 12px;
     }
+
 
     .system-status {
         display: none;

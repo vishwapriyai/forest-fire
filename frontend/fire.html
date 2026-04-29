@@ -11,11 +11,13 @@
     <div class="app-shell">
         <header class="topbar">
             <a class="brand" href="fire.html">
-                <span class="brand-mark">TN</span>
-                <span>
+                <div class="brand-mark">
+                    <img src="./assets/download.png" alt="In22 Labs logo">
+                </div>
+                <div>
                     <span class="brand-title">Tamil Nadu Fire Intelligence</span>
                     <span class="brand-subtitle">Observed fire and 5-day prediction workspace</span>
-                </span>
+                </div>
             </a>
             <div class="system-status">
                 <span id="apiDot" class="status-dot"></span>
@@ -35,23 +37,23 @@
                     <h2>At A Glance</h2>
                     <div class="metric-grid">
                         <div class="metric">
-                            <span class="metric-label">Observed fires</span>
+                            <span class="metric-label">Recent fire spots</span>
                             <span id="metricFire" class="metric-value">0</span>
-                            <span class="metric-note">NASA detections in last 5 days</span>
+                            <span class="metric-note">Fire locations seen in the last 5 days</span>
                         </div>
                         <div class="metric">
-                            <span class="metric-label">Average forecast</span>
+                            <span class="metric-label">Average risk</span>
                             <span id="metricGrid" class="metric-value">0%</span>
-                            <span class="metric-note">Tamil Nadu day risk average</span>
+                            <span class="metric-note">Overall fire chance for the selected day</span>
                         </div>
                         <div class="metric">
-                            <span class="metric-label">High-risk zones</span>
+                            <span class="metric-label">Watch closely</span>
                             <span id="metricPredictions" class="metric-value">0</span>
-                            <span class="metric-note">Predicted cells above 70%</span>
+                            <span class="metric-note">Areas with higher predicted fire risk</span>
                         </div>
                     </div>
                     <div class="snapshot-note">
-                        <span class="snapshot-label">Latest observed day</span>
+                        <span class="snapshot-label">Latest fire data</span>
                         <strong id="metricLatest">-</strong>
                     </div>
                 </section>
@@ -60,16 +62,20 @@
                     <h2>Map Layers</h2>
                     <div class="control-group">
                         <label class="layer-toggle">
-                            <span class="layer-meta"><span class="swatch heat"></span> Last 5 days fire heatmap</span>
+                            <span class="layer-meta"><span class="swatch base"></span> Forest map background</span>
+                            <span class="toggle"><input type="checkbox" data-layer="forestBase"><span></span></span>
+                        </label>
+                        <label class="layer-toggle">
+                            <span class="layer-meta"><span class="swatch heat"></span> Recent fire areas</span>
                             <span class="toggle"><input type="checkbox" data-layer="heat" checked><span></span></span>
                         </label>
                         <label class="layer-toggle">
-                            <span class="layer-meta"><span class="swatch prediction"></span> Predicted fire markers</span>
+                            <span class="layer-meta"><span class="swatch prediction"></span> Predicted fire points</span>
                             <span class="toggle"><input type="checkbox" data-layer="prediction" checked><span></span></span>
                         </label>
                         <label class="layer-toggle">
-                            <span class="layer-meta"><span class="swatch grid"></span> Prediction grid cells</span>
-                            <span class="toggle"><input type="checkbox" data-layer="grid" checked><span></span></span>
+                            <span class="layer-meta"><span class="swatch grid"></span> Predicted risk areas</span>
+                            <span class="toggle"><input type="checkbox" data-layer="grid"><span></span></span>
                         </label>
                     </div>
                 </section>
@@ -78,7 +84,7 @@
                     <h2>Forecast Horizon</h2>
                     <div class="range-control">
                         <div class="range-line">
-                            <span>Selected day</span>
+                            <span>Prediction day</span>
                             <span id="dayLabel">Day 1</span>
                         </div>
                         <input id="daySlider" type="range" min="1" max="5" value="1">
@@ -113,9 +119,11 @@
                 </div>
                 <div class="legend">
                     <h3>Map Read</h3>
-                    <div class="legend-row"><span class="swatch heat"></span> Heat = observed fire in last 5 days</div>
-                    <div class="legend-row"><span class="swatch grid"></span> Soft grid = forecast fire-prone area</div>
-                    <div class="legend-row"><span class="swatch prediction"></span> Small dots = forecast hotspots</div>
+                    <!-- <div class="legend-row"><span class="swatch base"></span> Toggle forest background on when needed</div> -->
+                    <div class="legend-row"><span class="swatch heat"></span> Warmer color means more recent fire activity</div>
+                    <div class="legend-row"><span class="swatch grid"></span> Shaded blocks show where fire risk may be higher</div>
+                    <div class="legend-row"><span class="swatch prediction"></span> Small dots mark the stronger predicted points</div>
+                    <!-- <div class="legend-row"><span class="swatch border"></span> Fine lines show Tamil Nadu district borders</div> -->
                 </div>
             </section>
         </main>

@@ -1,24 +1,28 @@
 import pandas as pd
 from fastapi import APIRouter
 
+from app.services.refresh_service import ensure_daily_refresh
 
 router = APIRouter()
 
 
 @router.get("/")
 def predict(day: int = 1):
+    ensure_daily_refresh()
     df = pd.read_csv(f"data/processed/grid_predictions_day{day}.csv")
     return df.to_dict(orient="records")
 
 
 @router.get("/grid")
 def get_prediction_grid(day: int = 1):
+    ensure_daily_refresh()
     df = pd.read_csv(f"data/processed/grid_predictions_day{day}.csv")
     return df.to_dict(orient="records")
 
 
 @router.get("/summary")
 def get_prediction_summary(day: int = 1):
+    ensure_daily_refresh()
     df = pd.read_csv(f"data/processed/grid_predictions_day{day}.csv")
     top = df.sort_values("predicted_risk", ascending=False).head(8)
     return {
@@ -31,6 +35,7 @@ def get_prediction_summary(day: int = 1):
 
 @router.get("/geojson")
 def get_prediction_geojson(day: int = 1):
+    ensure_daily_refresh()
     df = pd.read_csv(f"data/processed/grid_predictions_day{day}.csv")
     features = []
     for _, row in df.iterrows():

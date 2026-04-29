@@ -1,37 +1,78 @@
-const API_BASE = window.FOREST_API_BASE ||
-    (window.location.protocol === "http:" || window.location.protocol === "https:"
-        ? window.location.origin
-        : "http://127.0.0.1:8000");
+
+const API_BASE = window.FOREST_API_BASE || "http://127.0.0.1:8000";
+
+// const API_BASE = window.FOREST_API_BASE ||
+//     (window.location.protocol === "http:" || window.location.protocol === "https:"
+//         ? window.location.origin
+//         : "http://127.0.0.1:8000");
 const DEFAULT_CENTER = [10.7, 78.4];
 const DEFAULT_ZOOM = 7;
 
 const state = {
     map: null,
     layers: {},
+    basemaps: {},
     active: {
+        forestBase: false,
         heat: true,
-        grid: true,
+        grid: false,
         prediction: true
     },
     recent: { type: "FeatureCollection", features: [] },
     predictions: [],
-    summary: null
+    summary: null,
+    districts: null
 };
 
 const $ = (id) => document.getElementById(id);
+
+function certaintyLabel(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "h") return "high certainty";
+    if (normalized === "n") return "medium certainty";
+    if (normalized === "l") return "lower certainty";
+    return "certainty not available";
+}
 
 function initMap() {
     state.map = L.map("map", { zoomControl: false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
     L.control.zoom({ position: "bottomleft" }).addTo(state.map);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+
+    state.basemaps.light = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap & CartoDB"
     }).addTo(state.map);
 
+    state.basemaps.forest = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+        maxZoom: 19,
+        attribution: "Tiles &copy; Esri"
+    });
+
+    state.basemaps.forestLabels = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
+        pane: "overlayPane",
+        attribution: "&copy; OpenStreetMap & CartoDB"
+    });
+
     state.layers.heat = null;
+    state.layers.districts = L.layerGroup().addTo(state.map);
     state.layers.grid = L.layerGroup().addTo(state.map);
     state.layers.prediction = L.layerGroup().addTo(state.map);
+}
+
+function syncBasemap() {
+    const usingForest = state.active.forestBase;
+
+    if (usingForest) {
+        if (state.map.hasLayer(state.basemaps.light)) state.map.removeLayer(state.basemaps.light);
+        if (!state.map.hasLayer(state.basemaps.forest)) state.basemaps.forest.addTo(state.map);
+        if (!state.map.hasLayer(state.basemaps.forestLabels)) state.basemaps.forestLabels.addTo(state.map);
+    } else {
+        if (state.map.hasLayer(state.basemaps.forest)) state.map.removeLayer(state.basemaps.forest);
+        if (state.map.hasLayer(state.basemaps.forestLabels)) state.map.removeLayer(state.basemaps.forestLabels);
+        if (!state.map.hasLayer(state.basemaps.light)) state.basemaps.light.addTo(state.map);
+    }
 }
 
 async function fetchJson(path, fallback = null) {
@@ -83,6 +124,29 @@ function syncLayerVisibility(key) {
     if (!state.active[key] && state.map.hasLayer(layer)) state.map.removeLayer(layer);
 }
 
+async function loadDistrictBorders() {
+    if (state.districts) return state.districts;
+    state.districts = await fetchJson("/assets/tamil_nadu_districts.geojson", null);
+    return state.districts;
+}
+
+function renderDistrictBorders() {
+    state.layers.districts.clearLayers();
+    if (!state.districts || !state.districts.features) return;
+
+    const districtLayer = L.geoJSON(state.districts, {
+        style: () => ({
+            color: "#6f5a50",
+            weight: 1,
+            opacity: 0.7,
+            fillOpacity: 0
+        })
+    });
+
+    districtLayer.addTo(state.layers.districts);
+    districtLayer.bringToFront();
+}
+
 function renderHeatmap() {
     if (state.layers.heat && state.map.hasLayer(state.layers.heat)) {
         state.map.removeLayer(state.layers.heat);
@@ -124,9 +188,9 @@ function renderPredictionGrid() {
             fillOpacity: 0.12
         })
             .bindPopup(
-                `<strong>Predicted fire cell</strong><br>` +
-                `Risk: ${formatPercent(Number(cell.predicted_risk || 0))}<br>` +
-                `Forecast: ${String(cell.forecast_date).slice(0, 10)}`
+                `<strong>Predicted risk area</strong><br>` +
+                `Chance of fire: ${formatPercent(Number(cell.predicted_risk || 0))}<br>` +
+                `For date: ${String(cell.forecast_date).slice(0, 10)}`
             )
             .addTo(state.layers.grid);
     });
@@ -148,9 +212,9 @@ function renderPredictionMarkers() {
                 fillOpacity: 0.92
             })
                 .bindPopup(
-                    `<strong>Forecast hotspot</strong><br>` +
-                    `Risk: ${formatPercent(risk)}<br>` +
-                    `Forecast: ${String(cell.forecast_date).slice(0, 10)}<br>` +
+                    `<strong>Predicted fire point</strong><br>` +
+                    `Chance of fire: ${formatPercent(risk)}<br>` +
+                    `For date: ${String(cell.forecast_date).slice(0, 10)}<br>` +
                     `Recent fire influence: ${formatPercent(Number(cell.recent_fire_score || 0))}`
                 )
                 .addTo(state.layers.prediction);
@@ -197,11 +261,11 @@ function renderRiskList() {
         return `
             <article class="risk-row ${band}">
                 <div class="row-head">
-                    <span>Zone ${index + 1}</span>
+                    <span>Area ${index + 1}</span>
                     <span>${formatPercent(risk)}</span>
                 </div>
                 <div class="progress"><span class="${band}" style="width:${risk * 100}%"></span></div>
-                <p class="metric-note">${Number(row.lat).toFixed(2)}, ${Number(row.lon).toFixed(2)} for ${String(row.forecast_date).slice(0, 10)}</p>
+                <p class="metric-note">${Number(row.lat).toFixed(2)}, ${Number(row.lon).toFixed(2)} for ${String(row.forecast_date).slice(0, 10)}. This area may need closer watch.</p>
             </article>
         `;
     }).join("");
@@ -227,7 +291,7 @@ function renderRecentList() {
                 <span>${feature.properties.date}</span>
                 <span>FRP ${Number(feature.properties.frp || 0).toFixed(1)}</span>
             </div>
-            <p class="metric-note">${Number(feature.geometry.coordinates[1]).toFixed(2)}, ${Number(feature.geometry.coordinates[0]).toFixed(2)} with confidence ${feature.properties.confidence}</p>
+            <p class="metric-note">${Number(feature.geometry.coordinates[1]).toFixed(2)}, ${Number(feature.geometry.coordinates[0]).toFixed(2)} with ${certaintyLabel(feature.properties.confidence)} that this is a real fire signal.</p>
         </article>
     `).join("");
 }
@@ -259,6 +323,10 @@ function bindControls() {
         state.active[key] = input.checked;
         input.addEventListener("change", () => {
             state.active[key] = input.checked;
+            if (key === "forestBase") {
+                syncBasemap();
+                return;
+            }
             syncLayerVisibility(key);
         });
     });
@@ -296,13 +364,15 @@ async function loadPredictions(day = 1) {
 async function loadAll() {
     const day = $("daySlider")?.value || 1;
     const [health, recent] = await Promise.all([
-        fetchJson("/", null),
+        fetchJson("/api", null),
         fetchJson("/risk/recent", { type: "FeatureCollection", features: [] })
     ]);
 
     setApiStatus(Boolean(health));
     state.recent = recent || { type: "FeatureCollection", features: [] };
+    await loadDistrictBorders();
 
+    renderDistrictBorders();
     renderHeatmap();
     renderRecentList();
     await loadPredictions(day);
@@ -311,6 +381,7 @@ async function loadAll() {
 
 document.addEventListener("DOMContentLoaded", () => {
     initMap();
+    syncBasemap();
     bindControls();
     loadAll();
 });

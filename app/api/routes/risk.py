@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 from fastapi import APIRouter
 
+from app.services.refresh_service import ensure_daily_refresh
 
 router = APIRouter()
 
@@ -15,6 +16,7 @@ def _read_json(path):
 
 @router.get("/")
 def get_risk():
+    ensure_daily_refresh()
     path = Path("data/processed/grid_risk.geojson")
     if not path.exists():
         path = Path("data/processed/recent_fire_last5.geojson")
@@ -23,16 +25,19 @@ def get_risk():
 
 @router.get("/recent")
 def get_recent_fire_risk():
+    ensure_daily_refresh()
     return _read_json("data/processed/recent_fire_last5.geojson")
 
 
 @router.get("/historical")
 def get_historical_risk():
+    ensure_daily_refresh()
     return _read_json("data/processed/recent_fire_last5.geojson")
 
 
 @router.get("/summary")
 def get_recent_fire_summary():
+    ensure_daily_refresh()
     df = pd.read_csv("data/processed/recent_fire_last5.csv")
     if df.empty:
         return {"fire_count": 0, "avg_frp": 0, "max_frp": 0}

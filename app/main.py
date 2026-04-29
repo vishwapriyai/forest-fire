@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import prediction, risk
+from app.services.refresh_service import ensure_daily_refresh
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -26,6 +27,7 @@ app.add_middleware(
 
 app.include_router(risk.router, prefix="/risk", tags=["Risk"])
 app.include_router(prediction.router, prefix="/prediction", tags=["Prediction"])
+app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIR)), name="assets")
 app.mount("/css", StaticFiles(directory=str(FRONTEND_DIR / "css")), name="css")
 app.mount("/js", StaticFiles(directory=str(FRONTEND_DIR / "js")), name="js")
 
@@ -42,6 +44,7 @@ def fire_page():
 
 @app.get("/api")
 def api_root():
+    ensure_daily_refresh()
     return {
         "message": "Tamil Nadu Fire Intelligence API running",
         "views": {
