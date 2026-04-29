@@ -1,4 +1,7 @@
-const API_BASE = window.FOREST_API_BASE || "http://127.0.0.1:8000";
+const API_BASE = window.FOREST_API_BASE ||
+    (window.location.protocol === "http:" || window.location.protocol === "https:"
+        ? window.location.origin
+        : "http://127.0.0.1:8000");
 const DEFAULT_CENTER = [10.7, 78.4];
 const DEFAULT_ZOOM = 7;
 
