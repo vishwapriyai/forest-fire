@@ -34,7 +34,7 @@ app.mount("/js", StaticFiles(directory=str(FRONTEND_DIR / "js")), name="js")
 
 @app.get("/")
 def root():
-    return FileResponse(FRONTEND_DIR / "fire.html")
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 @app.get("/fire")

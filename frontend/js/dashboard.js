@@ -1,78 +1,79 @@
-
-const API_BASE = window.FOREST_API_BASE || "http://127.0.0.1:8000";
-
-// const API_BASE = window.FOREST_API_BASE ||
-//     (window.location.protocol === "http:" || window.location.protocol === "https:"
-//         ? window.location.origin
-//         : "http://127.0.0.1:8000");
+const API_BASE = window.FOREST_API_BASE ||
+    (window.location.protocol === "http:" || window.location.protocol === "https:"
+        ? window.location.origin
+        : "http://127.0.0.1:8000");
 const DEFAULT_CENTER = [10.7, 78.4];
 const DEFAULT_ZOOM = 7;
 
 const state = {
     map: null,
     layers: {},
-    basemaps: {},
     active: {
-        forestBase: false,
         heat: true,
-        grid: false,
+        grid: true,
         prediction: true
     },
     recent: { type: "FeatureCollection", features: [] },
     predictions: [],
-    summary: null,
-    districts: null
+    summary: null
 };
 
-const $ = (id) => document.getElementById(id);
+const locationCache = {};
+let currentRenderId = 0;
 
-function certaintyLabel(value) {
-    const normalized = String(value || "").trim().toLowerCase();
-    if (normalized === "h") return "high certainty";
-    if (normalized === "n") return "medium certainty";
-    if (normalized === "l") return "lower certainty";
-    return "certainty not available";
+async function getLocationName(lat, lon) {
+    const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+    if (locationCache[key]) return locationCache[key];
+
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.address) {
+                const addr = data.address;
+                const locName = addr.forest || addr.park || addr.natural || addr.hamlet || addr.village || addr.town || addr.city || addr.suburb || addr.neighbourhood || addr.road || addr.municipality;
+                const district = addr.state_district || addr.county;
+
+                let result = "";
+                if (district) {
+                    result = district;
+                    if (locName && locName !== district) {
+                        result += `, ${locName}`;
+                    }
+                } else if (locName) {
+                    result = locName;
+                } else {
+                    result = data.name || addr.state || "Tamil Nadu Region";
+                }
+
+                locationCache[key] = result;
+                return result;
+            } else if (data && data.name) {
+                locationCache[key] = data.name;
+                return data.name;
+            }
+        }
+    } catch (e) {
+        console.warn("Geocoding failed", e);
+    }
+    locationCache[key] = "Tamil Nadu Region";
+    return "Tamil Nadu Region";
 }
+
+const $ = (id) => document.getElementById(id);
 
 function initMap() {
     state.map = L.map("map", { zoomControl: false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
     L.control.zoom({ position: "bottomleft" }).addTo(state.map);
-
-    state.basemaps.light = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap & CartoDB"
     }).addTo(state.map);
 
-    state.basemaps.forest = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-        maxZoom: 19,
-        attribution: "Tiles &copy; Esri"
-    });
-
-    state.basemaps.forestLabels = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
-        pane: "overlayPane",
-        attribution: "&copy; OpenStreetMap & CartoDB"
-    });
-
     state.layers.heat = null;
-    state.layers.districts = L.layerGroup().addTo(state.map);
     state.layers.grid = L.layerGroup().addTo(state.map);
     state.layers.prediction = L.layerGroup().addTo(state.map);
-}
-
-function syncBasemap() {
-    const usingForest = state.active.forestBase;
-
-    if (usingForest) {
-        if (state.map.hasLayer(state.basemaps.light)) state.map.removeLayer(state.basemaps.light);
-        if (!state.map.hasLayer(state.basemaps.forest)) state.basemaps.forest.addTo(state.map);
-        if (!state.map.hasLayer(state.basemaps.forestLabels)) state.basemaps.forestLabels.addTo(state.map);
-    } else {
-        if (state.map.hasLayer(state.basemaps.forest)) state.map.removeLayer(state.basemaps.forest);
-        if (state.map.hasLayer(state.basemaps.forestLabels)) state.map.removeLayer(state.basemaps.forestLabels);
-        if (!state.map.hasLayer(state.basemaps.light)) state.basemaps.light.addTo(state.map);
-    }
 }
 
 async function fetchJson(path, fallback = null) {
@@ -124,29 +125,6 @@ function syncLayerVisibility(key) {
     if (!state.active[key] && state.map.hasLayer(layer)) state.map.removeLayer(layer);
 }
 
-async function loadDistrictBorders() {
-    if (state.districts) return state.districts;
-    state.districts = await fetchJson("/assets/tamil_nadu_districts.geojson", null);
-    return state.districts;
-}
-
-function renderDistrictBorders() {
-    state.layers.districts.clearLayers();
-    if (!state.districts || !state.districts.features) return;
-
-    const districtLayer = L.geoJSON(state.districts, {
-        style: () => ({
-            color: "#6f5a50",
-            weight: 1,
-            opacity: 0.7,
-            fillOpacity: 0
-        })
-    });
-
-    districtLayer.addTo(state.layers.districts);
-    districtLayer.bringToFront();
-}
-
 function renderHeatmap() {
     if (state.layers.heat && state.map.hasLayer(state.layers.heat)) {
         state.map.removeLayer(state.layers.heat);
@@ -188,9 +166,9 @@ function renderPredictionGrid() {
             fillOpacity: 0.12
         })
             .bindPopup(
-                `<strong>Predicted risk area</strong><br>` +
-                `Chance of fire: ${formatPercent(Number(cell.predicted_risk || 0))}<br>` +
-                `For date: ${String(cell.forecast_date).slice(0, 10)}`
+                `<strong>Predicted fire cell</strong><br>` +
+                `Risk: ${formatPercent(Number(cell.predicted_risk || 0))}<br>` +
+                `Forecast: ${String(cell.forecast_date).slice(0, 10)}`
             )
             .addTo(state.layers.grid);
     });
@@ -212,9 +190,9 @@ function renderPredictionMarkers() {
                 fillOpacity: 0.92
             })
                 .bindPopup(
-                    `<strong>Predicted fire point</strong><br>` +
-                    `Chance of fire: ${formatPercent(risk)}<br>` +
-                    `For date: ${String(cell.forecast_date).slice(0, 10)}<br>` +
+                    `<strong>Forecast hotspot</strong><br>` +
+                    `Risk: ${formatPercent(risk)}<br>` +
+                    `Forecast: ${String(cell.forecast_date).slice(0, 10)}<br>` +
                     `Recent fire influence: ${formatPercent(Number(cell.recent_fire_score || 0))}`
                 )
                 .addTo(state.layers.prediction);
@@ -241,95 +219,11 @@ function renderMetrics() {
     setText("metricLatest", latestDate);
 }
 
-const locationCache = {};
-
-// async function getLocationName(lat, lon) {
-//     try {
-//         const res = await fetch(
-//             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
-//         );
-//         const data = await res.json();
-
-//         return (
-//             data.address?.city ||
-//             data.address?.town ||
-//             data.address?.village ||
-//             data.address?.county ||
-//             data.address?.state ||
-//             "Unknown location"
-//         );
-//     } catch (err) {
-//         console.warn("Location fetch failed", err);
-//         return "Unknown location";
-//     }
-// }
-async function getLocationName(lat, lon) {
-    const key = `${lat},${lon}`;
-    if (locationCache[key]) return locationCache[key];
-
-    try {
-        const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
-            {
-                headers: {
-                    "Accept": "application/json"
-                }
-            }
-        );
-
-        const data = await res.json();
-
-        console.log("Location API response:", data); // 🔍 DEBUG
-
-        const location =
-            data.address?.city ||
-            data.address?.town ||
-            data.address?.village ||
-            data.address?.county ||
-            data.address?.state ||
-            "Unknown location";
-
-        locationCache[key] = location;
-
-        return location;
-    } catch (err) {
-        console.error("Location fetch failed", err);
-        return "Unknown location";
-    }
-}
-// function renderRiskList() {
-//     const list = $("riskList");
-//     if (!list) return;
-
-//     const topZones = state.predictions
-//         .slice()
-//         .sort((a, b) => Number(b.predicted_risk || 0) - Number(a.predicted_risk || 0))
-//         .slice(0, 5);
-
-//     if (!topZones.length) {
-//         list.innerHTML = `<div class="empty-state">No prediction data available.</div>`;
-//         return;
-//     }
-
-//     list.innerHTML = topZones.map((row, index) => {
-//         const risk = Number(row.predicted_risk || 0);
-//         const band = riskBand(risk);
-//         return `
-//             <article class="risk-row ${band}">
-//                 <div class="row-head">
-//                     <span>Area ${index + 1}</span>
-//                     <span>${formatPercent(risk)}</span>
-//                 </div>
-//                 <div class="progress"><span class="${band}" style="width:${risk * 100}%"></span></div>
-//                 <p class="metric-note">${Number(row.lat).toFixed(2)}, ${Number(row.lon).toFixed(2)},${Number(row.recent_fire_score || 0).toFixed(2)} for ${String(row.forecast_date).slice(0, 10)}. This area may need closer watch.</p>
-//             </article>
-//         `;
-//     }).join("");
-// }
-
 async function renderRiskList() {
     const list = $("riskList");
     if (!list) return;
+
+    const renderId = ++currentRenderId;
 
     const topZones = state.predictions
         .slice()
@@ -341,45 +235,34 @@ async function renderRiskList() {
         return;
     }
 
-    // 🔹 Step 1: Render immediately (without location)
     list.innerHTML = topZones.map((row, index) => {
         const risk = Number(row.predicted_risk || 0);
         const band = riskBand(risk);
-
+        const locId = `zone-loc-${renderId}-${index}`;
         return `
-            <article class="risk-row ${band}" id="risk-${index}">
+            <article class="risk-row ${band}" style="cursor: pointer;" onclick="state.map.flyTo([${row.lat}, ${row.lon}], 10)">
                 <div class="row-head">
                     <span>Area ${index + 1}</span>
                     <span>${formatPercent(risk)}</span>
                 </div>
-
-                <div class="progress">
-                    <span class="${band}" style="width:${risk * 100}%"></span>
-                </div>
-
-                <p class="metric-note" id="loc-${index}">
-                    📍 Loading location...
-                    (${Number(row.lat).toFixed(2)}, ${Number(row.lon).toFixed(2)})
+                <div class="progress"><span class="${band}" style="width:${risk * 100}%"></span></div>
+                <p class="metric-note">
+                    <span id="${locId}">Loading location...</span><br>
+                    ${Number(row.lat).toFixed(2)}, ${Number(row.lon).toFixed(2)} for ${String(row.forecast_date).slice(0, 10)}. This area may need closer watch.
                 </p>
             </article>
         `;
     }).join("");
 
-    // 🔹 Step 2: Update location async
-    topZones.forEach(async (row, index) => {
-        const location = await getLocationName(row.lat, row.lon);
-
-        const el = document.getElementById(`loc-${index}`);
-        if (el) {
-            el.innerHTML = `
-                📍 ${location} 
-                (${Number(row.lat).toFixed(2)}, ${Number(row.lon).toFixed(2)}) <br>
-                🔥 Risk Score: ${Number(row.recent_fire_score || 0).toFixed(2)} <br>
-                📅 ${String(row.forecast_date).slice(0, 10)}
-            `;
-        }
-    });
+    for (let index = 0; index < topZones.length; index++) {
+        const row = topZones[index];
+        const name = await getLocationName(Number(row.lat), Number(row.lon));
+        if (renderId !== currentRenderId) return;
+        const el = $(`zone-loc-${renderId}-${index}`);
+        if (el) el.textContent = name;
+    }
 }
+
 function renderRecentList() {
     const list = $("recentList");
     if (!list) return;
@@ -400,7 +283,7 @@ function renderRecentList() {
                 <span>${feature.properties.date}</span>
                 <span>FRP ${Number(feature.properties.frp || 0).toFixed(1)}</span>
             </div>
-            <p class="metric-note">${Number(feature.geometry.coordinates[1]).toFixed(2)}, ${Number(feature.geometry.coordinates[0]).toFixed(2)} with ${certaintyLabel(feature.properties.confidence)} that this is a real fire signal.</p>
+            <p class="metric-note">${Number(feature.geometry.coordinates[1]).toFixed(2)}, ${Number(feature.geometry.coordinates[0]).toFixed(2)} with confidence ${feature.properties.confidence}</p>
         </article>
     `).join("");
 }
@@ -432,10 +315,6 @@ function bindControls() {
         state.active[key] = input.checked;
         input.addEventListener("change", () => {
             state.active[key] = input.checked;
-            if (key === "forestBase") {
-                syncBasemap();
-                return;
-            }
             syncLayerVisibility(key);
         });
     });
@@ -473,15 +352,13 @@ async function loadPredictions(day = 1) {
 async function loadAll() {
     const day = $("daySlider")?.value || 1;
     const [health, recent] = await Promise.all([
-        fetchJson("/api", null),
+        fetchJson("/", null),
         fetchJson("/risk/recent", { type: "FeatureCollection", features: [] })
     ]);
 
     setApiStatus(Boolean(health));
     state.recent = recent || { type: "FeatureCollection", features: [] };
-    await loadDistrictBorders();
 
-    renderDistrictBorders();
     renderHeatmap();
     renderRecentList();
     await loadPredictions(day);
@@ -490,7 +367,6 @@ async function loadAll() {
 
 document.addEventListener("DOMContentLoaded", () => {
     initMap();
-    syncBasemap();
     bindControls();
     loadAll();
 });
