@@ -241,7 +241,93 @@ function renderMetrics() {
     setText("metricLatest", latestDate);
 }
 
-function renderRiskList() {
+const locationCache = {};
+
+// async function getLocationName(lat, lon) {
+//     try {
+//         const res = await fetch(
+//             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+//         );
+//         const data = await res.json();
+
+//         return (
+//             data.address?.city ||
+//             data.address?.town ||
+//             data.address?.village ||
+//             data.address?.county ||
+//             data.address?.state ||
+//             "Unknown location"
+//         );
+//     } catch (err) {
+//         console.warn("Location fetch failed", err);
+//         return "Unknown location";
+//     }
+// }
+async function getLocationName(lat, lon) {
+    const key = `${lat},${lon}`;
+    if (locationCache[key]) return locationCache[key];
+
+    try {
+        const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+            {
+                headers: {
+                    "Accept": "application/json"
+                }
+            }
+        );
+
+        const data = await res.json();
+
+        console.log("Location API response:", data); // 🔍 DEBUG
+
+        const location =
+            data.address?.city ||
+            data.address?.town ||
+            data.address?.village ||
+            data.address?.county ||
+            data.address?.state ||
+            "Unknown location";
+
+        locationCache[key] = location;
+
+        return location;
+    } catch (err) {
+        console.error("Location fetch failed", err);
+        return "Unknown location";
+    }
+}
+// function renderRiskList() {
+//     const list = $("riskList");
+//     if (!list) return;
+
+//     const topZones = state.predictions
+//         .slice()
+//         .sort((a, b) => Number(b.predicted_risk || 0) - Number(a.predicted_risk || 0))
+//         .slice(0, 5);
+
+//     if (!topZones.length) {
+//         list.innerHTML = `<div class="empty-state">No prediction data available.</div>`;
+//         return;
+//     }
+
+//     list.innerHTML = topZones.map((row, index) => {
+//         const risk = Number(row.predicted_risk || 0);
+//         const band = riskBand(risk);
+//         return `
+//             <article class="risk-row ${band}">
+//                 <div class="row-head">
+//                     <span>Area ${index + 1}</span>
+//                     <span>${formatPercent(risk)}</span>
+//                 </div>
+//                 <div class="progress"><span class="${band}" style="width:${risk * 100}%"></span></div>
+//                 <p class="metric-note">${Number(row.lat).toFixed(2)}, ${Number(row.lon).toFixed(2)},${Number(row.recent_fire_score || 0).toFixed(2)} for ${String(row.forecast_date).slice(0, 10)}. This area may need closer watch.</p>
+//             </article>
+//         `;
+//     }).join("");
+// }
+
+async function renderRiskList() {
     const list = $("riskList");
     if (!list) return;
 
@@ -255,22 +341,45 @@ function renderRiskList() {
         return;
     }
 
+    // 🔹 Step 1: Render immediately (without location)
     list.innerHTML = topZones.map((row, index) => {
         const risk = Number(row.predicted_risk || 0);
         const band = riskBand(risk);
+
         return `
-            <article class="risk-row ${band}">
+            <article class="risk-row ${band}" id="risk-${index}">
                 <div class="row-head">
                     <span>Area ${index + 1}</span>
                     <span>${formatPercent(risk)}</span>
                 </div>
-                <div class="progress"><span class="${band}" style="width:${risk * 100}%"></span></div>
-                <p class="metric-note">${Number(row.lat).toFixed(2)}, ${Number(row.lon).toFixed(2)} for ${String(row.forecast_date).slice(0, 10)}. This area may need closer watch.</p>
+
+                <div class="progress">
+                    <span class="${band}" style="width:${risk * 100}%"></span>
+                </div>
+
+                <p class="metric-note" id="loc-${index}">
+                    📍 Loading location...
+                    (${Number(row.lat).toFixed(2)}, ${Number(row.lon).toFixed(2)})
+                </p>
             </article>
         `;
     }).join("");
-}
 
+    // 🔹 Step 2: Update location async
+    topZones.forEach(async (row, index) => {
+        const location = await getLocationName(row.lat, row.lon);
+
+        const el = document.getElementById(`loc-${index}`);
+        if (el) {
+            el.innerHTML = `
+                📍 ${location} 
+                (${Number(row.lat).toFixed(2)}, ${Number(row.lon).toFixed(2)}) <br>
+                🔥 Risk Score: ${Number(row.recent_fire_score || 0).toFixed(2)} <br>
+                📅 ${String(row.forecast_date).slice(0, 10)}
+            `;
+        }
+    });
+}
 function renderRecentList() {
     const list = $("recentList");
     if (!list) return;
