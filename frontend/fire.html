@@ -20,10 +20,10 @@
                     <span class="brand-subtitle">Observed fire and 5-day prediction workspace</span>
                 </div>
             </a>
-            <div class="system-status">
+            <!-- <div class="system-status">
                 <span id="apiDot" class="status-dot"></span>
-                <span id="apiLabel">Checking API</span>
-            </div>
+                <span id="apiLabel">Checking API</span> 
+            </div> -->
         </header>
 
         <main class="workspace fire-only">
@@ -62,10 +62,10 @@
                 <section class="section">
                     <h2>Map Layers</h2>
                     <div class="control-group">
-                        <label class="layer-toggle">
+                        <!-- <label class="layer-toggle">
                             <span class="layer-meta"><span class="swatch base"></span> Forest map background</span>
                             <span class="toggle"><input type="checkbox" data-layer="forestBase"><span></span></span>
-                        </label>
+                        </label> -->
                         <label class="layer-toggle">
                             <span class="layer-meta"><span class="swatch heat"></span> Recent fire areas</span>
                             <span class="toggle"><input type="checkbox" data-layer="heat" checked><span></span></span>
@@ -74,7 +74,12 @@
                             <span class="layer-meta"><span class="swatch prediction"></span> Predicted fire points</span>
                             <span class="toggle"><input type="checkbox" data-layer="prediction" checked><span></span></span>
                         </label>
-                        <label class="layer-toggle">
+                        <!-- <label class="layer-toggle">
+                            <span class="layer-meta"><span class="swatch grid"></span> Predicted risk areas</span>
+                            <span class="toggle"><input type="checkbox" data-layer="grid"><span></span></span>
+                        </label> -->
+
+                        <label class="layer-toggle" style="display: none;">
                             <span class="layer-meta"><span class="swatch grid"></span> Predicted risk areas</span>
                             <span class="toggle"><input type="checkbox" data-layer="grid"><span></span></span>
                         </label>
@@ -122,7 +127,7 @@
                     <h3>Map Read</h3>
                     <!-- <div class="legend-row"><span class="swatch base"></span> Toggle forest background on when needed</div> -->
                     <div class="legend-row"><span class="swatch heat"></span> Warmer color means more recent fire activity</div>
-                    <div class="legend-row"><span class="swatch grid"></span> Shaded blocks show where fire risk may be higher</div>
+                    <!-- <div class="legend-row"><span class="swatch grid"></span> Shaded blocks show where fire risk may be higher</div> -->
                     <div class="legend-row"><span class="swatch prediction"></span> Small dots mark the stronger predicted points</div>
                     <!-- <div class="legend-row"><span class="swatch border"></span> Fine lines show Tamil Nadu district borders</div> -->
                 </div>

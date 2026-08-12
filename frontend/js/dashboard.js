@@ -89,7 +89,7 @@ async function fetchJson(path, fallback = null) {
 
 function setApiStatus(online) {
     const dot = $("apiDot");
-    const label = $("apiLabel");
+    // const label = $("apiLabel");
     if (!dot || !label) return;
     dot.classList.toggle("online", online);
     dot.classList.toggle("offline", !online);
