@@ -151,7 +151,8 @@
 
             if (user === 'fireadmin' && pass === 'admin') {
                 errorDiv.textContent = "";
-                window.location.href = "/fire";
+                const isStatic = window.location.hostname.includes("github.io") || window.location.protocol === "file:";
+                window.location.href = isStatic ? "fire.html" : "/fire";
             } else if (user === 'forestadmin' && pass === 'admin') {
                 errorDiv.textContent = "";
                 const currentHost = window.location.hostname;

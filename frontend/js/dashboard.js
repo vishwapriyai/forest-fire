@@ -78,7 +78,25 @@ function initMap() {
 
 async function fetchJson(path, fallback = null) {
     try {
-        const response = await fetch(`${API_BASE}${path}`);
+        let url = `${API_BASE}${path}`;
+        
+        // Detect if running statically (e.g. GitHub Pages or file protocol)
+        const isStatic = window.location.hostname.includes("github.io") || window.location.protocol === "file:";
+        if (isStatic) {
+            if (path === "/") {
+                return { status: "static" };
+            } else if (path === "/risk/recent") {
+                url = "data/recent_fire_last5.geojson";
+            } else if (path.startsWith("/prediction/grid")) {
+                const day = new URLSearchParams(path.split("?")[1]).get("day") || 1;
+                url = `data/grid_predictions_day${day}.json`;
+            } else if (path.startsWith("/prediction/summary")) {
+                const day = new URLSearchParams(path.split("?")[1]).get("day") || 1;
+                url = `data/prediction_summary_day${day}.json`;
+            }
+        }
+
+        const response = await fetch(url);
         if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
         return await response.json();
     } catch (error) {
